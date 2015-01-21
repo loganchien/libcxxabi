@@ -1132,7 +1132,8 @@ __gxx_personality_v0(_Unwind_State state,
         // _US_UNWIND_FRAME_STARTING).
 
         // Phase 2 search
-        if (unwind_exception->barrier_cache.sp == _Unwind_GetGR(context, REG_SP))
+        if (!is_force_unwinding &&
+            unwind_exception->barrier_cache.sp == _Unwind_GetGR(context, REG_SP))
         {
             // Found a catching handler in phase 1
             if (native_exception)
@@ -1158,7 +1159,10 @@ __gxx_personality_v0(_Unwind_State state,
         // Either we didn't do a phase 1 search (due to forced unwinding), or
         //  phase 1 reported no catching-handlers.
         // Search for a (non-catching) cleanup
-        scan_eh_tab(results, _UA_CLEANUP_PHASE, native_exception, unwind_exception, context);
+        scan_eh_tab(results,
+                    is_force_unwinding ? static_cast<_Unwind_Action>(_UA_CLEANUP_PHASE | _UA_FORCE_UNWIND)
+                                       : _UA_CLEANUP_PHASE,
+                    native_exception, unwind_exception, context);
         if (results.reason == _URC_HANDLER_FOUND)
         {
             // Found a non-catching handler

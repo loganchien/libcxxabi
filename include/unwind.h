@@ -107,11 +107,6 @@ struct _Unwind_Control_Block {
   long long int :0; /* Enforce the 8-byte alignment */
 };
 
-typedef _Unwind_Reason_Code (*_Unwind_Stop_Fn)
-      (_Unwind_State state,
-       _Unwind_Exception* exceptionObject,
-       struct _Unwind_Context* context);
-
 typedef _Unwind_Reason_Code (*__personality_routine)
       (_Unwind_State state,
        _Unwind_Exception* exceptionObject,
@@ -136,14 +131,6 @@ struct _Unwind_Exception {
 #endif
 };
 
-typedef _Unwind_Reason_Code (*_Unwind_Stop_Fn)
-    (int version,
-     _Unwind_Action actions,
-     uint64_t exceptionClass,
-     _Unwind_Exception* exceptionObject,
-     struct _Unwind_Context* context,
-     void* stop_parameter );
-
 typedef _Unwind_Reason_Code (*__personality_routine)
       (int version,
        _Unwind_Action actions,
@@ -151,6 +138,14 @@ typedef _Unwind_Reason_Code (*__personality_routine)
        _Unwind_Exception* exceptionObject,
        struct _Unwind_Context* context);
 #endif
+
+typedef _Unwind_Reason_Code (*_Unwind_Stop_Fn)
+    (int version,
+     _Unwind_Action actions,
+     uint64_t exceptionClass,
+     _Unwind_Exception* exceptionObject,
+     struct _Unwind_Context* context,
+     void* stop_parameter );
 
 #ifdef __cplusplus
 extern "C" {
