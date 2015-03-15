@@ -214,27 +214,39 @@ uint32_t RegisterRange(uint8_t start, uint8_t count_minus_one) {
  */
 extern "C" const uint32_t*
 decode_eht_entry(const uint32_t* data, size_t* off, size_t* len) {
-  assert((*data & 0x80000000) != 0 &&
-         "decode_eht_entry() does not support user-defined personality");
-
-  // 6.3: ARM Compact Model
-  // EHT entries here correspond to the __aeabi_unwind_cpp_pr[012] PRs indeded
-  // by format:
-  Descriptor::Format format =
-      static_cast<Descriptor::Format>((*data & 0x0f000000) >> 24);
-  switch (format) {
-    case Descriptor::SU16:
-      *len = 4;
-      *off = 1;
-      break;
-    case Descriptor::LU16:
-    case Descriptor::LU32:
-      *len = 4 + 4 * ((*data & 0x00ff0000) >> 16);
-      *off = 2;
-      break;
-    default:
-      return nullptr;
+  if ((*data & 0x80000000) == 0) {
+    // 6.2: Generic Model
+    //
+    // EHT entry is a prel31 pointing to the PR, followed by data understood
+    // only by the personality routine. Fortunately, all existing assembler
+    // implementations, including GNU assembler, LLVM integrated assembler,
+    // and ARM assembler, assume that the unwind opcodes come after the
+    // personality rountine address.
+    *off = 1; // First byte is size data.
+    *len = (((data[1] >> 24) & 0xff) + 1) * 4;
+    data++; // Skip the first word, which is the prel31 offset.
+  } else {
+    // 6.3: ARM Compact Model
+    //
+    // EHT entries here correspond to the __aeabi_unwind_cpp_pr[012] PRs indeded
+    // by format:
+    Descriptor::Format format =
+        static_cast<Descriptor::Format>((*data & 0x0f000000) >> 24);
+    switch (format) {
+      case Descriptor::SU16:
+        *len = 4;
+        *off = 1;
+        break;
+      case Descriptor::LU16:
+      case Descriptor::LU32:
+        *len = 4 + 4 * ((*data & 0x00ff0000) >> 16);
+        *off = 2;
+        break;
+      default:
+        return nullptr;
+    }
   }
+
   return data;
 }
 
@@ -446,14 +458,14 @@ unwind_phase1(unw_context_t *uc, _Unwind_Exception *exception_object) {
 
     // Ask libuwind to get next frame (skip over first which is
     // _Unwind_RaiseException).
-    int stepResult = unw_step(&cursor1);
+    int stepResult = _unw_step0(&cursor1);
     if (stepResult == 0) {
-      _LIBUNWIND_TRACE_UNWINDING("unwind_phase1(ex_ojb=%p): unw_step() reached "
+      _LIBUNWIND_TRACE_UNWINDING("unwind_phase1(ex_ojb=%p): _unw_step0() reached "
                                  "bottom => _URC_END_OF_STACK\n",
                                  static_cast<void *>(exception_object));
       return _URC_END_OF_STACK;
     } else if (stepResult < 0) {
-      _LIBUNWIND_TRACE_UNWINDING("unwind_phase1(ex_ojb=%p): unw_step failed => "
+      _LIBUNWIND_TRACE_UNWINDING("unwind_phase1(ex_ojb=%p): _unw_step0 failed => "
                                  "_URC_FATAL_PHASE1_ERROR\n",
                                  static_cast<void *>(exception_object));
       return _URC_FATAL_PHASE1_ERROR;
@@ -576,14 +588,14 @@ static _Unwind_Reason_Code unwind_phase2(unw_context_t *uc,
       resume = false;
     }
 
-    int stepResult = unw_step(&cursor2);
+    int stepResult = _unw_step0(&cursor2);
     if (stepResult == 0) {
-      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): unw_step() reached "
+      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): _unw_step0() reached "
                                  "bottom => _URC_END_OF_STACK\n",
                                  static_cast<void *>(exception_object));
       return _URC_END_OF_STACK;
     } else if (stepResult < 0) {
-      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): unw_step failed => "
+      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): _unw_step0 failed => "
                                  "_URC_FATAL_PHASE1_ERROR\n",
                                  static_cast<void *>(exception_object));
       return _URC_FATAL_PHASE2_ERROR;

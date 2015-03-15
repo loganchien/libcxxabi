@@ -224,8 +224,20 @@ _LIBUNWIND_EXPORT int unw_set_fpreg(unw_cursor_t *cursor, unw_regnum_t regNum,
 _LIBUNWIND_EXPORT int unw_step(unw_cursor_t *cursor) {
   _LIBUNWIND_TRACE_API("unw_step(cursor=%p)\n", static_cast<void *>(cursor));
   AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
+#if LIBCXXABI_ARM_EHABI
+  return co->unwindFrameAndStep();
+#else
+  return co->step();
+#endif
+}
+
+#if LIBCXXABI_ARM_EHABI
+_LIBUNWIND_EXPORT int _unw_step0(unw_cursor_t *cursor) {
+  _LIBUNWIND_TRACE_API("unw_step0(cursor=%p)\n", static_cast<void *>(cursor));
+  AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
   return co->step();
 }
+#endif
 
 
 /// Get unwind info at cursor position in stack frame.

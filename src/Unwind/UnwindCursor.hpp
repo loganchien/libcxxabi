@@ -31,6 +31,7 @@
 #include "DwarfInstructions.hpp"
 #include "EHHeaderParser.hpp"
 #include "libunwind.h"
+#include "libunwind_ext.h"
 #include "Registers.hpp"
 #include "Unwind-EHABI.h"
 
@@ -408,6 +409,10 @@ public:
 #ifdef __arm__
   virtual void saveVFPAsX() { _LIBUNWIND_ABORT("saveVFPAsX not implemented"); }
 #endif
+
+#if LIBCXXABI_ARM_EHABI
+  virtual int unwindFrameAndStep() { _LIBUNWIND_ABORT("unwindFrameAndStep not implemented"); }
+#endif
 };
 
 /// UnwindCursor contains all state (including all register values) during
@@ -440,6 +445,19 @@ private:
 
 #if LIBCXXABI_ARM_EHABI
   bool getInfoFromEHABISection(pint_t pc, const UnwindInfoSections &sects);
+
+  int unwindFrameAndStep() override {
+    size_t len = 0;
+    size_t off = 0;
+    // FIXME: Calling decode_eht_entry() here is violating the libunwind
+    // abstraction layer.
+    const uint32_t *ehtp =
+        decode_eht_entry(reinterpret_cast<const uint32_t *>(_info.unwind_info),
+                         &off, &len);
+    if (_Unwind_VRS_Interpret((_Unwind_Context *)this, ehtp, off, len) != _URC_CONTINUE_UNWIND)
+      return UNW_STEP_END;
+    return step();
+  }
 #endif
 
 #if _LIBUNWIND_SUPPORT_DWARF_UNWIND
