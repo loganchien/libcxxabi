@@ -216,26 +216,37 @@ uint32_t RegisterRange(uint8_t start, uint8_t count_minus_one) {
  */
 extern "C" const uint32_t*
 decode_eht_entry(const uint32_t* data, size_t* off, size_t* len) {
-  assert((*data & 0x80000000) != 0 &&
-         "decode_eht_entry() does not support user-defined personality");
-
-  // 6.3: ARM Compact Model
-  // EHT entries here correspond to the __aeabi_unwind_cpp_pr[012] PRs indeded
-  // by format:
-  Descriptor::Format format =
-      static_cast<Descriptor::Format>((*data & 0x0f000000) >> 24);
-  switch (format) {
-    case Descriptor::SU16:
-      *len = 4;
-      *off = 1;
-      break;
-    case Descriptor::LU16:
-    case Descriptor::LU32:
-      *len = 4 + 4 * ((*data & 0x00ff0000) >> 16);
-      *off = 2;
-      break;
-    default:
-      return nullptr;
+  if ((*data & 0x80000000) == 0) {
+    // 6.2: Generic Model
+    //
+    // EHT entry is a prel31 pointing to the PR, followed by data understood
+    // only by the personality routine. Fortunately, all existing assembler
+    // implementations, including GNU assembler, LLVM integrated assembler,
+    // and ARM assembler, assume that the unwind opcodes come after the
+    // personality rountine address.
+    *off = 1; // First byte is size data.
+    *len = (((data[1] >> 24) & 0xff) + 1) * 4;
+    data++; // Skip the first word, which is the prel31 offset.
+  } else {
+    // 6.3: ARM Compact Model
+    //
+    // EHT entries here correspond to the __aeabi_unwind_cpp_pr[012] PRs indeded
+    // by format:
+    Descriptor::Format format =
+        static_cast<Descriptor::Format>((*data & 0x0f000000) >> 24);
+    switch (format) {
+      case Descriptor::SU16:
+        *len = 4;
+        *off = 1;
+        break;
+      case Descriptor::LU16:
+      case Descriptor::LU32:
+        *len = 4 + 4 * ((*data & 0x00ff0000) >> 16);
+        *off = 2;
+        break;
+      default:
+        return nullptr;
+    }
   }
   return data;
 }
