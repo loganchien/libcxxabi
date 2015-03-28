@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 #include "libunwind_ext.h"
@@ -110,6 +111,13 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
   _LIBUNWIND_TRACE_API("_Unwind_Backtrace(callback=%p)\n",
                        (void *)(uintptr_t)callback);
 
+#if LIBCXXABI_ARM_EHABI
+  // Create a mock exception object for force unwinding.
+  _Unwind_Exception ex;
+  memset(&ex, '\0', sizeof(ex));
+  ex.exception_class = 0x434C4E47554E5700; // CLNGUNW\0
+#endif
+
   // walk each frame
   while (true) {
     _Unwind_Reason_Code result;
@@ -130,8 +138,13 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
       return _URC_END_OF_STACK;
     }
 
-    struct _Unwind_Context *context = (struct _Unwind_Context *)&cursor;
+    // Update the pr_cache in the mock exception object.
     const uint32_t* unwindInfo = (uint32_t *) frameInfo.unwind_info;
+    ex.pr_cache.fnstart = frameInfo.start_ip;
+    ex.pr_cache.ehtp = (_Unwind_EHT_Header *) unwindInfo;
+    ex.pr_cache.additional= frameInfo.flags;
+
+    struct _Unwind_Context *context = (struct _Unwind_Context *)&cursor;
     if ((*unwindInfo & 0x80000000) == 0) {
       // 6.2: Generic Model
       // EHT entry is a prel31 pointing to the PR, followed by data understood
@@ -139,13 +152,6 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
       // location or availability of the unwind opcodes in the generic model,
       // we have to call personality functions with (_US_VIRTUAL_UNWIND_FRAME |
       // _US_FORCE_UNWIND) state.
-
-      // Create a mock exception object for force unwinding.
-      _Unwind_Exception ex;
-      ex.exception_class = 0x434C4E47554E5700; // CLNGUNW\0
-      ex.pr_cache.fnstart = frameInfo.start_ip;
-      ex.pr_cache.ehtp = (_Unwind_EHT_Header *) unwindInfo;
-      ex.pr_cache.additional= frameInfo.flags;
 
       // Get and call the personality function to unwind the frame.
       __personality_routine pr = (__personality_routine) readPrel31(unwindInfo);
