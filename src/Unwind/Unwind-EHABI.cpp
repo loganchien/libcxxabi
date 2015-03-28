@@ -169,23 +169,25 @@ static _Unwind_Reason_Code unwindOneFrame(_Unwind_State state,
   assert((*unwindingData & 0xf0000000) == 0x80000000 && "Must be a compact entry");
   Descriptor::Format format =
       static_cast<Descriptor::Format>((*unwindingData & 0x0f000000) >> 24);
+
+  const char *lsda =
+      reinterpret_cast<const char *>(_Unwind_GetLanguageSpecificData(context));
+
+  // Handle descriptors before unwinding so they are processed in the context
+  // of the correct stack frame.
+  _Unwind_Reason_Code result =
+      ProcessDescriptors(state, ucbp, context, format, lsda,
+                         ucbp->pr_cache.additional);
+
+  if (result != _URC_CONTINUE_UNWIND)
+    return result;
+
   size_t len = 0;
   size_t off = 0;
   unwindingData = decode_eht_entry(unwindingData, &off, &len);
   if (unwindingData == nullptr) {
     return _URC_FAILURE;
   }
-
-  // Handle descriptors before unwinding so they are processed in the context
-  // of the correct stack frame.
-  _Unwind_Reason_Code result =
-      ProcessDescriptors(
-          state, ucbp, context, format,
-          reinterpret_cast<const char*>(ucbp->pr_cache.ehtp) + len,
-          ucbp->pr_cache.additional);
-
-  if (result != _URC_CONTINUE_UNWIND)
-    return result;
 
   return _Unwind_VRS_Interpret(context, unwindingData, off, len);
 }
