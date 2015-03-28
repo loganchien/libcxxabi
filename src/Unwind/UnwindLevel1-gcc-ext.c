@@ -145,31 +145,14 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
     ex.pr_cache.additional= frameInfo.flags;
 
     struct _Unwind_Context *context = (struct _Unwind_Context *)&cursor;
-    if ((*unwindInfo & 0x80000000) == 0) {
-      // 6.2: Generic Model
-      // EHT entry is a prel31 pointing to the PR, followed by data understood
-      // only by the personality routine. Since EHABI doesn't guarantee the
-      // location or availability of the unwind opcodes in the generic model,
-      // we have to call personality functions with (_US_VIRTUAL_UNWIND_FRAME |
-      // _US_FORCE_UNWIND) state.
-
-      // Get and call the personality function to unwind the frame.
-      __personality_routine pr = (__personality_routine) readPrel31(unwindInfo);
-      if (pr(_US_VIRTUAL_UNWIND_FRAME | _US_FORCE_UNWIND, &ex, context) !=
-              _URC_CONTINUE_UNWIND) {
-        return _URC_END_OF_STACK;
-      }
-    } else {
-      size_t off, len;
-      unwindInfo = decode_eht_entry(unwindInfo, &off, &len);
-      if (unwindInfo == NULL) {
-        return _URC_FAILURE;
-      }
-
-      result = _Unwind_VRS_Interpret(context, unwindInfo, off, len);
-      if (result != _URC_CONTINUE_UNWIND) {
-        return _URC_END_OF_STACK;
-      }
+    // Get and call the personality function to unwind the frame.
+    __personality_routine handler = (__personality_routine) frameInfo.handler;
+    if (handler == NULL) {
+      return _URC_END_OF_STACK;
+    }
+    if (handler(_US_VIRTUAL_UNWIND_FRAME | _US_FORCE_UNWIND, &ex, context) !=
+            _URC_CONTINUE_UNWIND) {
+      return _URC_END_OF_STACK;
     }
 #endif // LIBCXXABI_ARM_EHABI
 

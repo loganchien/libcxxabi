@@ -440,6 +440,20 @@ private:
 
 #if LIBCXXABI_ARM_EHABI
   bool getInfoFromEHABISection(pint_t pc, const UnwindInfoSections &sects);
+
+  int stepWithEHABI() {
+    size_t len = 0;
+    size_t off = 0;
+    // FIXME: Calling decode_eht_entry() here is violating the libunwind
+    // abstraction layer.
+    const uint32_t *ehtp =
+        decode_eht_entry(reinterpret_cast<const uint32_t *>(_info.unwind_info),
+                         &off, &len);
+    if (_Unwind_VRS_Interpret((_Unwind_Context *)this, ehtp, off, len) !=
+            _URC_CONTINUE_UNWIND)
+      return UNW_STEP_END;
+    return UNW_STEP_SUCCESS;
+  }
 #endif
 
 #if _LIBUNWIND_SUPPORT_DWARF_UNWIND
@@ -1284,7 +1298,7 @@ int UnwindCursor<A, R>::step() {
 #elif _LIBUNWIND_SUPPORT_DWARF_UNWIND
   result = this->stepWithDwarfFDE();
 #elif LIBCXXABI_ARM_EHABI
-  result = UNW_STEP_SUCCESS;
+  result = this->stepWithEHABI();
 #else
   #error Need _LIBUNWIND_SUPPORT_COMPACT_UNWIND or \
               _LIBUNWIND_SUPPORT_DWARF_UNWIND or \

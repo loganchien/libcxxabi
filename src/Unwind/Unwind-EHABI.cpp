@@ -182,14 +182,9 @@ static _Unwind_Reason_Code unwindOneFrame(_Unwind_State state,
   if (result != _URC_CONTINUE_UNWIND)
     return result;
 
-  size_t len = 0;
-  size_t off = 0;
-  unwindingData = decode_eht_entry(unwindingData, &off, &len);
-  if (unwindingData == nullptr) {
+  if (unw_step(reinterpret_cast<unw_cursor_t*>(context)) != UNW_STEP_SUCCESS)
     return _URC_FAILURE;
-  }
-
-  return _Unwind_VRS_Interpret(context, unwindingData, off, len);
+  return _URC_CONTINUE_UNWIND;
 }
 
 // Generates mask discriminator for _Unwind_VRS_Pop, e.g. for _UVRSC_CORE /
@@ -457,6 +452,7 @@ unwind_phase1(unw_context_t *uc, _Unwind_Exception *exception_object) {
   // Walk each frame looking for a place to stop.
   for (bool handlerNotFound = true; handlerNotFound;) {
 
+#if !LIBCXXABI_ARM_EHABI
     // Ask libuwind to get next frame (skip over first which is
     // _Unwind_RaiseException).
     int stepResult = unw_step(&cursor1);
@@ -471,6 +467,7 @@ unwind_phase1(unw_context_t *uc, _Unwind_Exception *exception_object) {
                                  static_cast<void *>(exception_object));
       return _URC_FATAL_PHASE1_ERROR;
     }
+#endif
 
     // See if frame has code to run (has personality routine).
     unw_proc_info_t frameInfo;
@@ -589,6 +586,7 @@ static _Unwind_Reason_Code unwind_phase2(unw_context_t *uc,
       resume = false;
     }
 
+#if !LIBCXXABI_ARM_EHABI
     int stepResult = unw_step(&cursor2);
     if (stepResult == 0) {
       _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): unw_step() reached "
@@ -601,6 +599,7 @@ static _Unwind_Reason_Code unwind_phase2(unw_context_t *uc,
                                  static_cast<void *>(exception_object));
       return _URC_FATAL_PHASE2_ERROR;
     }
+#endif
 
     // Get info about this frame.
     unw_word_t sp;
