@@ -731,7 +731,7 @@ bool UnwindCursor<A, R>::getInfoFromEHABISection(
   //   isSingleWordEHT -- whether the entry is in the index.
   unw_word_t personalityRoutine = 0xbadf00d;
   bool scope32 = false;
-  uintptr_t lsda = 0xbadf00d;
+  uintptr_t lsda;
 
   // If the high bit in the exception handling table entry is set, the entry is
   // in compact form (section 6.3 EHABI).
@@ -744,16 +744,19 @@ bool UnwindCursor<A, R>::getInfoFromEHABISection(
         personalityRoutine = (unw_word_t) &__aeabi_unwind_cpp_pr0;
         extraWords = 0;
         scope32 = false;
+        lsda = isSingleWordEHT ? 0 : (exceptionTableAddr + 4);
         break;
       case 1:
         personalityRoutine = (unw_word_t) &__aeabi_unwind_cpp_pr1;
         extraWords = (exceptionTableData & 0x00ff0000) >> 16;
         scope32 = false;
+        lsda = exceptionTableAddr + (extraWords + 1) * 4;
         break;
       case 2:
         personalityRoutine = (unw_word_t) &__aeabi_unwind_cpp_pr2;
         extraWords = (exceptionTableData & 0x00ff0000) >> 16;
         scope32 = true;
+        lsda = exceptionTableAddr + (extraWords + 1) * 4;
         break;
       default:
         _LIBUNWIND_ABORT("unknown personality routine");
