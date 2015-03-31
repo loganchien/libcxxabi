@@ -122,6 +122,7 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
   while (true) {
     _Unwind_Reason_Code result;
 
+#if !LIBCXXABI_ARM_EHABI
     // ask libuwind to get next frame (skip over first frame which is
     // _Unwind_Backtrace())
     if (unw_step(&cursor) <= 0) {
@@ -130,8 +131,7 @@ _Unwind_Backtrace(_Unwind_Trace_Fn callback, void *ref) {
                                  _URC_END_OF_STACK);
       return _URC_END_OF_STACK;
     }
-
-#if LIBCXXABI_ARM_EHABI
+#else
     // Get the information for this frame.
     unw_proc_info_t frameInfo;
     if (unw_get_proc_info(&cursor, &frameInfo) != UNW_ESUCCESS) {
